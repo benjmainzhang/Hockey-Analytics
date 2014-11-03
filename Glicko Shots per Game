@@ -1,0 +1,139 @@
+g = function(rd){
+  Q = log(10)/400
+  a = rd^2*3*Q^2/(pi^2)
+  return ((1/(1+a))^0.5)
+}
+
+expected.outcome = function(team.rating, opponent.rating, rd){
+  Q = log(10)/400
+  1/(1+10^(g(rd)*(team.rating-opponent.rating)/(-400)))
+}
+
+d.squared = function(rd, team.rating, opponent.rating){
+  Q = log(10)/400
+  g = g(rd)
+  exp.team = expected.outcome(team.rating, opponent.rating, rd)
+  return ((Q^2*g^2*exp.team*(1-exp.team))^-1)
+}
+
+correction = function(team.rating, opponent.rating, rd, outcome){
+  Q = log(10)/400
+  d.sq = d.squared(rd, team.rating, opponent.rating)
+  g = g(rd)
+  exp.home = expected.outcome(team.rating, opponent.rating, rd)
+  return (Q/(1/(rd^2) + 1/(d.sq^2)) * g*(outcome - exp.home))
+}
+
+new.rd = function(rd, home.rating, away.rating){
+  Q = log(10)/400
+  d.sq = d.squared(rd, home.rating, away.rating)
+  return (((1/(rd^2)+1/(d.sq))^-1)^0.5)
+}
+
+####################################
+#Update.gliko takes a data frame (subset of overall data), and an optional K Value as arguments.
+#The function then initializes a team list and initial ratings.
+####################################
+
+shots.game.glicko = function(df, initrd = 25,verbose=TRUE) {
+  begin.time = Sys.time()
+  ###
+  #team list is a list containing all appropriate NHL teams
+  #teamrating is the ESPO ratings of each team
+  ###
+  teamlist = c("ANA", "ATL", "BOS", "BUF", "CAR", "CBJ", "CGY", "CHI", "COL", "DAL", "DET", "EDM", "FLA", "L.A", "MIN", "MTL", "N.J", "NSH", "NYI", "NYR", "OTT", "PHI", "PHX", "PIT", "S.J", "STL", "T.B", "TOR", "VAN", "WPG", "WSH", "Home Ice Advantage")
+  teamrating = c(rep(1500, 31), 20)
+  #Ratings Deviation
+  teamRD = c(rep(initrd, 32))
+  rating.progression = teamrating
+  RD.progression = teamRD
+  #day.list = sort(unique(df$refdate))
+  day.split = split(df, df$refdate)
+  #Initializes shot.comparison data frame
+  total.games = length(unique(df$gcode))
+  shot.comparison = data.frame(matrix(data = NA, nrow = total.games, ncol = 14))
+  colnames(shot.comparison) = c("Event ID", "Day Code", "Game Code", "Home", "Away", "ELO Home", "ELO Away", "RD Home", "RD Away", "Home Ice", "Expected Outcome", "Expected Away", "Expected Sum", "Home Outcome")
+  shot.comparison.row.index = 1
+  for (jj in 1:length(day.split)){
+    #current.day = df[which(df$refdate == day.list[jj]),]
+    current.day = data.frame(day.split[jj])
+    colnames(current.day) = colnames(df)
+    game.list = sort(unique(current.day$gcode))
+    for (kk in 1:length(game.list)){
+      current.game = current.day[which(current.day$gcode == game.list[kk]),]
+      home.team.index = which(teamlist == current.game$hometeam[1])
+      home.team = teamlist[home.team.index]
+      home.rating = teamrating[home.team.index]
+      home.rd = teamRD[home.team.index]
+      
+      away.team.index = which(teamlist == current.game$awayteam[1])
+      away.team = teamlist[away.team.index]
+      away.rating = teamrating[away.team.index]
+      away.rd = teamRD[away.team.index]
+      
+      home.adv = teamrating[32]
+      
+      Exp.home = expected.outcome(home.rating, away.rating, home.rd)
+      Exp.away = expected.outcome(away.rating, home.rating, away.rd)
+      
+      shot.comparison$`Day Code`[shot.comparison.row.index] = current.game$refdate[1]
+      shot.comparison$`Game Code`[shot.comparison.row.index] = current.game$gcode[1]
+      shot.comparison$Home[shot.comparison.row.index] = home.team
+      shot.comparison$Away[shot.comparison.row.index] = away.team
+      shot.comparison$`ELO Home`[shot.comparison.row.index] = home.rating
+      shot.comparison$`ELO Away`[shot.comparison.row.index] = away.rating
+      shot.comparison$`RD Home`[shot.comparison.row.index] = home.rd
+      shot.comparison$`RD Away`[shot.comparison.row.index] = away.rd
+      shot.comparison$`Home Ice`[shot.comparison.row.index] = home.adv
+      shot.comparison$`Expected Outcome`[shot.comparison.row.index] = Exp.home
+      shot.comparison$`Expected Away`[shot.comparison.row.index] = Exp.away
+      shot.comparison$`Expected Sum`[shot.comparison.row.index] = Exp.home + Exp.away
+      
+      home.count = 0
+      away.count = 0
+      shots = nrow(current.game)
+      for (ii in 1:nrow(current.game)){
+        home.count = home.count + 1*(current.game$ev.team[ii] == home.team)
+        away.count = away.count + 1*(current.game$ev.team[ii] == away.team)
+        #Inputs predicted values for shot.comparison
+      }
+      home.outcome = home.count/shots
+      away.outcome = away.count/shots
+      shot.comparison$`Home Outcome`[shot.comparison.row.index] = home.outcome
+      
+      old.home.rating = home.rating
+      home.rating = home.rating + correction(home.rating, away.rating, home.rd, home.outcome)
+      home.rd = new.rd(home.rd, old.home.rating, away.rating)
+      
+      away.rating = away.rating + correction(away.rating, old.home.rating, away.rd, away.outcome)
+      away.rd = new.rd(away.rd, away.rating, old.home.rating)
+      
+      shot.comparison.row.index = shot.comparison.row.index + 1
+      
+      #home.adv = home.adv + 0*(1*(current.game$ev.team[ii] == home.team) - Exp.home)
+      
+      teamrating[home.team.index] = home.rating
+      teamrating[away.team.index] = away.rating
+      teamRD[home.team.index] = home.rd
+      teamRD[away.team.index] = away.rd
+      teamrating[32] = home.adv
+    }
+    RD.progression = cbind(RD.progression, teamRD)
+    rating.progression = cbind(rating.progression, teamrating)
+    print(jj/length(day.split))
+  }
+  
+  rownames(rating.progression) <- teamlist
+  shot.mse <- sum((shot.comparison$`Expected Outcome` - shot.comparison$`Home Outcome`)^2, na.rm=TRUE)/nrow(shot.comparison)
+  output <- list(rating.progression=rating.progression,
+                 RD.progression=RD.progression,
+                 shot.comparison=shot.comparison,
+                 shot.mse=shot.mse)
+  end.time = Sys.time()
+  time.elapsed = end.time - begin.time
+  print (time.elapsed)
+  return(output)
+}
+#################################
+#To access wanted information, use index of output list
+#################################
