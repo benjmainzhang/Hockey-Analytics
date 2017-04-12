@@ -2,19 +2,22 @@
 ### ( jackd@sfu.ca )
 
 ### Further patches by Philip Bulsink ( bulsinkp@gmail.com )
+
+### Further patched by Ben Zhang for 2016-2017 season (2017-04-17).
+
 require(nhlscrapr)
 ### Now works for extra seasons
 full.game.database <- function(extra.seasons = 0) {
     game.roster <- NULL
     seasons <- c("20022003", "20032004", "20052006", "20062007", "20072008", "20082009", "20092010", "20102011", "20112012", "20122013", "20132014",
-        "20142015", "20152016")
+        "20142015", "20152016", "20162017")
     if (extra.seasons > 0) {
-        seasons <- c(seasons, paste(2015 + 1:extra.seasons, 2016 + 1:extra.seasons, sep = ""))  ## Patched: Extra seasons now start at 20162017 - PB
+        seasons <- c(seasons, paste(2016 + 1:extra.seasons, 2017 + 1:extra.seasons, sep = ""))  ## Patched: Extra seasons now start at 20162017 - PB
     }
 
     ### Patched: bad.game.list now include many NULLs for additional seasons.  Reason: R doesn't allow adding NULL elements to a list after the line has
     ### been instantiated. - JD
-    games <- c(rep(1230, 9), 720, 1230, 1230, 1230, rep(1230, extra.seasons))
+    games <- c(rep(1230, 9), 720, 1230, 1230, 1230, 1230, rep(1230, extra.seasons))
     bad.game.list <- list(c(1:127, 134, 135, 582, 598, 872), c(10, 251, 453, 456, 482, 802, 1205), c(18, 140, 127, 234, 298, 458, 974), c(1024), c(1178),
         c(259, 409, 1077), c(81, 827, 836, 857, 863, 874, 885), c(124, 429), c(259), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(),
         c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(), c(),
@@ -55,6 +58,7 @@ full.game.database <- function(extra.seasons = 0) {
         5, 4, 6, 7, 7, 6, 6, 7,  7, 7, 6, 7,  6, 7,  5, #20132014
         6, 7, 5, 7, 6, 6, 4, 6,  6, 7, 4, 5,  7, 7,  6, #20142015 - PB
         6, 5, 6, 5, 6, 7, 7, 5,  5, 6, 7, 7,  7, 6,  6, #20152016 - PB
+        rep(7, 15), # 20162017
         rep(7, 15 * (extra.seasons)))
     sequence.seven <- function(nn) c(rep(1, nn), rep(0, 7 - nn))
     playoff.status <- c(sapply(playoff.series.lengths, sequence.seven))
@@ -146,7 +150,7 @@ compile.all.games <- function(rdata.folder = "nhlr-data", output.folder = "sourc
     date.check = FALSE, extra.seasons = 0, ...) {
 
     if (extra.seasons > 0) {
-        seasons <- c(seasons, paste(2015 + 1:extra.seasons, 2016 + 1:extra.seasons, sep = ""))  ## Patched: Extra seasons now start at 20162017 - PB
+        seasons <- c(seasons, paste(2016 + 1:extra.seasons, 2017 + 1:extra.seasons, sep = ""))  ## Patched: Extra seasons now start at 20172018 - PB
     }
 
     suppressWarnings(dir.create(output.folder))
@@ -172,9 +176,9 @@ compile.all.games <- function(rdata.folder = "nhlr-data", output.folder = "sourc
     if (!is.null(seasons)) {
         message("Overriding existing game table to create one with specified seasons.")
         eligible.seasons <- c("20022003", "20032004", "20052006", "20062007", "20072008", "20082009", "20092010", "20102011", "20112012", "20122013",
-            "20132014", "20142015", "20152016")
+            "20132014", "20142015", "20152016", "20162017")
         if (extra.seasons > 0) {
-            eligible.seasons <- c(seasons, paste(2015 + 1:extra.seasons, 2016 + 1:extra.seasons, sep = ""))  ## Patched: Extra seasons now start at 20162017 - PB
+            eligible.seasons <- c(seasons, paste(2016 + 1:extra.seasons, 2017 + 1:extra.seasons, sep = ""))  ## Patched: Extra seasons now start at 20172018 - PB
         }
         if (!all(seasons %in% eligible.seasons))
             stop("Specified seasons must be within ", paste(eligible.seasons, collapse = ", "))
